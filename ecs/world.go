@@ -9,7 +9,7 @@ import (
 
 type World struct {
 	entities     map[Entity]struct{}
-	components   map[ComponentName]map[Entity]Component
+	components   map[reflect.Type]map[Entity]any
 	dependencies map[Entity][]Entity
 	systems      map[string]System
 }
@@ -17,7 +17,7 @@ type World struct {
 func NewWorld() *World {
 	return &World{
 		entities:     map[Entity]struct{}{},
-		components:   map[ComponentName]map[Entity]Component{},
+		components:   map[reflect.Type]map[Entity]any{},
 		dependencies: map[Entity][]Entity{},
 		systems:      map[string]System{},
 	}
@@ -39,7 +39,7 @@ func (w *World) Register(systems ...System) error {
 	if len(errs) > 0 {
 		sb := strings.Builder{}
 		for _, err := range errs {
-			sb.WriteString(err.Error() + "\n")
+			sb.WriteString(fmt.Sprintf("%v\n", err))
 		}
 		return fmt.Errorf("%v", sb.String())
 	}
@@ -56,40 +56,44 @@ func (w *World) Update(elapsed time.Duration) error {
 	return nil
 }
 
-// Get returns the list of entities that have all of the provided names.
-func (w *World) Get(types ...ComponentName) []Entity {
-	result := []Entity{}
-	// Check every Entity ...
-	for e := range w.entities {
-		// For every type to check ...
-		count := 0
-		for _, ty := range types {
-			// If there are no components for that type, break from checking this entity further.
-			if _, ok := w.components[ty]; !ok {
+// Query returns the list of entities that have all of the provided names.
+func (w *World) Query(types ...reflect.Type) []Entity {
+	if len(types) == 0 {
+		return nil
+	}
+
+	// Find the smallest matching component set first to minimize iterations
+	var smallestMap map[Entity]any
+	minLen := -1
+
+	for _, t := range types {
+		compMap, ok := w.components[t]
+		if !ok || len(compMap) == 0 {
+			return nil // If any component type doesn't exist, zero entities match
+		}
+		if minLen == -1 || len(compMap) < minLen {
+			minLen = len(compMap)
+			smallestMap = compMap
+		}
+	}
+
+	var result []Entity
+
+	// Filter entities against all requested component types
+	for entity := range smallestMap {
+		hasAll := true
+		for _, t := range types {
+			if _, ok := w.components[t][entity]; !ok {
+				hasAll = false
 				break
 			}
-
-			// If this entity is present in the components then add it to the result.
-			if _, ok := w.components[ty][e]; ok {
-				count++
-			}
 		}
-		if len(types) == count {
-			result = append(result, e)
+		if hasAll {
+			result = append(result, entity)
 		}
 	}
+
 	return result
-}
-
-// Single is like Get, but will return the default value for Entity and false if
-// there is not exactly one Entity with the requested Components.
-func (w *World) Single(types ...ComponentName) (Entity, bool) {
-	es := w.Get(types...)
-	if len(es) != 1 {
-		var d Entity
-		return d, false
-	}
-	return es[0], true
 }
 
 // Exists returns whether an entity exists in this World.
@@ -98,60 +102,51 @@ func (w *World) Exists(e Entity) bool {
 	return ok
 }
 
-// Get retrieves the Component of Type T for Entity.
-func Get[T Component](u *World, e Entity) *T {
-	var dummy T
-	name := dummy.Name()
+// Add accepts a pointer to any value T
+func Add[T any](w *World, e Entity, c *T) {
+	t := reflect.TypeOf(c) // E.g., *Position
 
-	if v, ok := u.components[name]; ok {
-		// if v, ok := v[e]; ok {
-		// 	val := v.(*T)
-		// 	return val
-		// }
+	if _, ok := w.components[t]; !ok {
+		w.components[t] = map[Entity]any{}
+	}
+
+	w.components[t][e] = c
+}
+
+// Get returns *T directly from the map
+func Get[T any](w *World, e Entity) *T {
+	t := reflect.TypeOf((*T)(nil)) // Type representation of *T
+
+	if v, ok := w.components[t]; ok {
 		if componentAny, ok := v[e]; ok {
-			// 1. Assert the interface to the underlying concrete type 'T'
-			val, ok := componentAny.(T)
-			if !ok {
-				return nil
-			}
-			// 2. Take the address of that concrete value to return '*T'
-			return &val
+			return componentAny.(*T) // Safe pointer type assertion
 		}
 	}
 	return nil
 }
 
-// Add a component to Entity e, replacing the existing coponent if one of that
-// type already exists.
-func (w *World) Add(e Entity, c Component) error {
-	key := c.Name()
-	// if !strings.HasPrefix(reflect.TypeOf(c).String(), "*") {
-	// 	panic(fmt.Sprintf("cannot add non-pointer type %s", key))
-	// }
-	if _, ok := w.components[key]; !ok {
-		w.components[key] = map[Entity]Component{}
+// Remove removes the component of type T from Entity e.
+func Remove[T any](w *World, e Entity) {
+	t := reflect.TypeOf((*T)(nil))
+
+	compMap, ok := w.components[t]
+	if !ok {
+		return // Component type doesn't exist in the world, nothing to remove
 	}
 
-	w.components[key][e] = c
-	return nil
-}
+	// Delete the entity from this component type's sub-map
+	delete(compMap, e)
 
-// Remove the component with the specified type from the Entity.
-func (w *World) Remove(e Entity, component Component) {
-	// key := NameOf(component)
-	key := component.Name()
-	delete(w.components[key], e)
-
-	// If that was the last of this type, then remove the map that stores them.
-	if len(w.components[key]) == 0 {
-		delete(w.components, key)
+	// Clean up the parent map if no entities have this component left
+	if len(compMap) == 0 {
+		delete(w.components, t)
 	}
 }
 
 // Clear all Entities and their Components from the World, resetting it to an empty state.
 func (w *World) Clear() {
 	w.entities = map[Entity]struct{}{}
-	w.components = map[ComponentName]map[Entity]Component{}
+	w.components = map[reflect.Type]map[Entity]any{}
 }
 
 // Dependency adds a cascading delete rule for a pair of Entities. When parent

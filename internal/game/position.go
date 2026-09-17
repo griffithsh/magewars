@@ -1,7 +1,5 @@
 package game
 
-import "github.com/griffithsh/magewars/ecs"
-
 // Center defines the centre of something.
 type Center struct {
 	X, Y float64
@@ -15,9 +13,4 @@ type Position struct {
 	// Absolute Positioned Components use screen coordinates, not world
 	// coordinates.
 	Absolute bool
-}
-
-// Name of this component.
-func (p Position) Name() ecs.ComponentName {
-	return "Position"
 }

@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -35,8 +36,8 @@ duplicate system registered "ecs.ChildrenSystem"
 		for i := 0; i < 3; i++ {
 			kids.Value = append(kids.Value, w.CreateEntity())
 		}
-		w.Add(e, kids)
-		w.Add(e, Expiry{5 * time.Second})
+		Add(w, e, &kids)
+		Add(w, e, &Expiry{5 * time.Second})
 		// The world now has 4 Entites, and
 		// the primary Entity now has two Components
 
@@ -52,4 +53,22 @@ duplicate system registered "ecs.ChildrenSystem"
 			t.Fatalf("want no entities, got %d", w.Len())
 		}
 	})
+
+	t.Run("Store and retrieve components", func(t *testing.T) {
+		w := NewWorld()
+		e := w.CreateEntity()
+		Add(w, e, &Expiry{5 * time.Second})
+
+		expiry1 := Get[Expiry](w, e)
+		expiry1.Remaining = 4 * time.Second
+
+		expiry2 := Get[Expiry](w, e)
+		if fmt.Sprintf("%v", expiry2) != fmt.Sprintf("%v", expiry1) {
+			t.Errorf("pointer mismatch! want %p, got %p", expiry1, expiry2)
+		}
+		if expiry2.Remaining != 4*time.Second {
+			t.Errorf("time mismatch! want %v, got %v", 4*time.Second, expiry2.Remaining)
+		}
+	})
+
 }

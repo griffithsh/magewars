@@ -1,6 +1,9 @@
 package ecs
 
-import "time"
+import (
+	"reflect"
+	"time"
+)
 
 // ChildrenSystem manages Parent Components.
 type ChildrenSystem struct {
@@ -14,7 +17,7 @@ func NewChildrenSystem() *ChildrenSystem {
 // Update the ChildrenSystem to remove references to Children that have been
 // destroyed from the Parents that claim them.
 func (ps *ChildrenSystem) Update(w *World, _ time.Duration) error {
-	for _, e := range w.Get(Children{}.Name()) {
+	for _, e := range w.Query(reflect.TypeOf((*Children)(nil))) {
 		children := Get[Children](w, e)
 		val := []Entity{}
 		for _, child := range children.Value {
@@ -31,9 +34,4 @@ func (ps *ChildrenSystem) Update(w *World, _ time.Duration) error {
 // Children Component allows Entities to keep a reference to other entities.
 type Children struct {
 	Value []Entity
-}
-
-// Type of this Component.
-func (Children) Name() ComponentName {
-	return "Children"
 }

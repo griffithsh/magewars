@@ -1,15 +1,12 @@
 package ecs
 
 import (
+	"reflect"
 	"time"
 )
 
 type Expiry struct {
 	Remaining time.Duration
-}
-
-func (e Expiry) Name() ComponentName {
-	return "Expiry"
 }
 
 type ExpirySystem struct {
@@ -22,7 +19,7 @@ func NewExpirySystem() *ExpirySystem {
 
 // Update the ExpirySystem.
 func (es *ExpirySystem) Update(w *World, elapsed time.Duration) error {
-	for _, e := range w.Get(Expiry{}.Name()) {
+	for _, e := range w.Query(reflect.TypeOf((*Expiry)(nil))) {
 		expiry := Get[Expiry](w, e)
 
 		expiry.Remaining -= elapsed
