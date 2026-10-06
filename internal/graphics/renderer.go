@@ -25,6 +25,8 @@ type Renderer struct {
 	// randFloats are used to define whether a tile of an Entity with an Alpha
 	// component should be shown or not.
 	randFloats []float64
+
+	BackgroundColor color.NRGBA
 }
 
 // ImageProvider is the contract that the Renderer needs to retrieve images to
@@ -45,10 +47,11 @@ func NewRenderer(images ImageProvider) *Renderer {
 	}
 
 	v := Renderer{
-		textures:      map[string]*ebiten.Image{},
-		imageProvider: images,
-		worldCanvas:   ebiten.NewImage(1, 1),
-		randFloats:    pre,
+		textures:        map[string]*ebiten.Image{},
+		imageProvider:   images,
+		worldCanvas:     ebiten.NewImage(1, 1),
+		randFloats:      pre,
+		BackgroundColor: color.NRGBA{40, 34, 31, 0xff},
 	}
 	return &v
 }
@@ -350,7 +353,7 @@ func (r *Renderer) Render(w *ecs.World, screen *ebiten.Image, focusX, focusY, zo
 
 	entities := r.getEntities(w)
 
-	r.worldCanvas.Fill(color.NRGBA{40, 34, 31, 0xff})
+	r.worldCanvas.Fill(r.BackgroundColor)
 	r.absoluteCanvas.Clear()
 
 	for _, e := range entities {
