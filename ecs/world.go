@@ -56,6 +56,12 @@ func (w *World) Update(elapsed time.Duration) error {
 	return nil
 }
 
+// Ty is a helper function to get the reflect.Type of a type for use in Query,
+// QueryAny etc calls.
+func Ty[T any]() reflect.Type {
+	return reflect.TypeOf((*T)(nil))
+}
+
 // Query returns the list of entities that have all of the provided names.
 func (w *World) Query(types ...reflect.Type) []Entity {
 	if len(types) == 0 {
@@ -96,13 +102,44 @@ func (w *World) Query(types ...reflect.Type) []Entity {
 	return result
 }
 
+// QueryAny returns entities that possess AT LEAST ONE of the provided types.
+func (w *World) QueryAny(types ...reflect.Type) []Entity {
+	if len(types) == 0 {
+		return nil
+	}
+
+	// Use a set map to keep track of unique entities matching any component type
+	seen := make(map[Entity]struct{})
+
+	for _, t := range types {
+		compMap, ok := w.components[t]
+		if !ok {
+			continue
+		}
+		for entity := range compMap {
+			seen[entity] = struct{}{}
+		}
+	}
+
+	if len(seen) == 0 {
+		return nil
+	}
+
+	result := make([]Entity, 0, len(seen))
+	for entity := range seen {
+		result = append(result, entity)
+	}
+
+	return result
+}
+
 // Exists returns whether an entity exists in this World.
 func (w *World) Exists(e Entity) bool {
 	_, ok := w.entities[e]
 	return ok
 }
 
-// Add accepts a pointer to any value T
+// Add a Component to an Entity.
 func Add[T any](w *World, e Entity, c *T) {
 	t := reflect.TypeOf(c) // E.g., *Position
 
@@ -113,7 +150,7 @@ func Add[T any](w *World, e Entity, c *T) {
 	w.components[t][e] = c
 }
 
-// Get returns *T directly from the map
+// Get the Component of type T for an Entity.
 func Get[T any](w *World, e Entity) *T {
 	t := reflect.TypeOf((*T)(nil)) // Type representation of *T
 

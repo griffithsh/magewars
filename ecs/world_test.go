@@ -71,4 +71,23 @@ duplicate system registered "ecs.ChildrenSystem"
 		}
 	})
 
+	t.Run("Destroy dependants", func(t *testing.T) {
+		w := NewWorld()
+		e := w.CreateEntity()
+		for i := 0; i < 3; i++ {
+			ce := w.CreateEntity()
+			w.Dependency(e, ce)
+		}
+
+		if w.Len() != 4 {
+			t.Errorf("wrong test setup of entity length, want %d, got %d", 4, w.Len())
+		}
+
+		w.DestroyEntity(e)
+
+		if w.Len() != 0 {
+			t.Errorf("wrong entity length after Destroy, want %d, got %d", 0, w.Len())
+		}
+	})
+
 }

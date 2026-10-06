@@ -4,25 +4,31 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/csv"
 	"fmt"
 	"image"
 	"image/png"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/griffithsh/magewars/embedded"
+	"github.com/griffithsh/magewars/internal/game"
 )
 
 // Archive is a store of game data.
 type Archive struct {
-	images map[string]image.Image
+	images     map[string]image.Image
+	animations map[string][]game.Frame
 }
 
 // NewArchive constructs a new Archive.
 func NewArchive() (*Archive, error) {
 	archive := Archive{
-		images: map[string]image.Image{},
+		images:     map[string]image.Image{},
+		animations: map[string][]game.Frame{},
 	}
 	// Load all the embedded contents in here.
 	files, err := embedded.Filenames()
@@ -91,6 +97,50 @@ func (a *Archive) interpret(filename string, r io.Reader) error {
 			return fmt.Errorf("png.Decode %s: %s", filename, err)
 		}
 		a.images[filename] = decoded
+	case ".anim.csv":
+		// decode!
+		raw, err := csv.NewReader(r).ReadAll()
+		if err != nil {
+			return fmt.Errorf("csv reader.ReadAll %s: %s", filename, err)
+		}
+		frames := []game.Frame{}
+		for i, row := range raw {
+			frame := game.Frame{
+				Texture: row[0],
+			}
+			frame.X, err = strconv.Atoi(row[1])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 1", err, filename, i)
+			}
+			frame.Y, err = strconv.Atoi(row[2])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 2", err, filename, i)
+			}
+			frame.W, err = strconv.Atoi(row[3])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 3", err, filename, i)
+			}
+			frame.H, err = strconv.Atoi(row[4])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 4", err, filename, i)
+			}
+			frame.XOffset, err = strconv.Atoi(row[5])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 5", err, filename, i)
+			}
+			frame.YOffset, err = strconv.Atoi(row[6])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 6", err, filename, i)
+			}
+			duration, err := strconv.Atoi(row[7])
+			if err != nil {
+				return fmt.Errorf("syntax error (strconv.Atoi: %s): %s, row %d, column 6", err, filename, i)
+			}
+			frame.Duration = time.Duration(duration) * time.Millisecond
+
+			frames = append(frames, frame)
+		}
+		a.animations[filename] = frames
 	default:
 		fmt.Fprintf(os.Stderr, "WARNING: no handler configured for %q, detected extension was %q\n", filename, getExt(filename))
 	}
@@ -101,5 +151,11 @@ func (a *Archive) interpret(filename string, r io.Reader) error {
 // GetImage returns an image that has been loaded into the archive.
 func (a *Archive) GetImage(name string) (val image.Image, ok bool) {
 	val, ok = a.images[name]
+	return val, ok
+}
+
+// GetAnimation returns an animation by its file name.
+func (a *Archive) GetAnimation(name string) (val []game.Frame, ok bool) {
+	val, ok = a.animations[name]
 	return val, ok
 }
