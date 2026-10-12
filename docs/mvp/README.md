@@ -37,6 +37,7 @@ Multiple builds (no WASM)
 - InputSteeringSystem
   - Components: DesiredVelocity, GroundFriction, Mass, Force
   - calculates a Force based on current Velocity, Force and desired Velocity (from player input)
+  - Force = Mass * (DesiredVelocity / Velocity) / (responsiveness / GroundFriction)
   - responsiveness (sometimes called tau?) is derived from several factors
     - base value ("natural") 0.1 - 0.2
     - what the player input says!
@@ -47,14 +48,13 @@ Multiple builds (no WASM)
       - Normal = 1.0
       - Ice = 0.2
       - Mud = 2.0
-  - Force = Mass * (DesiredVelocity / Velocity) / (responsiveness / GroundFriction)
 - FrictionSystem (NOT IN SCOPE)
   - Handles GroundFriction for non-player controlled objects on the ground
   - Other system(s) MAY Apply Acceleration for wind resistance, gravity, propulsion of various sorts (magic missile)?
 - AirDragSystem (NOT IN SCOPE)
   - Component: AirDrag
   - Handles drag effects for airborne objects
-- MotionSystem (the dumb one)
+- MotionSystem (the dumb one) ✅
   - Component: Velocity, Acceleration, Force, Mass
   - Entity's Acceleration is changed based on Force and Mass
   - Entity's Velocity is changed based on Acceleration
