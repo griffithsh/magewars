@@ -46,7 +46,7 @@ func (f *Force) Clamp(max float64) {
 }
 
 type Mass struct {
-	Value float64
+	Value float64 // Value is in hundredths of a kg
 }
 
 type MotionSystem struct {
