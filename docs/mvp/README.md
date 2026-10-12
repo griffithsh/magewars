@@ -33,11 +33,11 @@ Multiple builds (no WASM)
 - AnimationSystem ✅
 - GroundFrictionSystem (NOT IN SCOPE) (no ice, mud etc in mvp)
   - Component: GroundFriction
-  - gets everything with a GroundFriction component and assigns distinct Traction and Drag values
-- InputSteeringSystem
+  - gets everything with a GroundFriction component and assigns distinct Traction and Drag values based on what terrain they're on
+- SteeringSystem ✅
   - Components: DesiredVelocity, GroundFriction, Mass, Force
   - calculates a Force based on current Velocity, Force and desired Velocity (from player input)
-  - Force = Mass * (DesiredVelocity / Velocity) / (responsiveness / GroundFriction)
+  - Force = Mass * (DesiredVelocity - Velocity) / (responsiveness / GroundFriction)
   - responsiveness (sometimes called tau?) is derived from several factors
     - base value ("natural") 0.1 - 0.2
     - what the player input says!
