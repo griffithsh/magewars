@@ -62,7 +62,7 @@ Multiple builds (no WASM)
   - System resets Acceleration and Force Components after update (to be recalculated next frame)
     - Other systems applying Acceleration *must* be updated first
   - Cull very small Velocity (and maybe Acceleration?) values
-- CollisionSystem
+- CollisionSystem ✅
   - Collidable Component
   - pushes things back if they collide? (what if they go right through though?)
     - What if you used the Velocity component to understand where the entity was previously?
@@ -78,3 +78,7 @@ Multiple builds (no WASM)
   - loadWorld (take a Tiled map and turn it into Entity and Component create calls)
   - unloadWorld
   - followMage (gives CameraSystem a target? what about sniper effects?)
+- Artwork
+  - A mage sprite
+  - An animated fireball sprite
+  - A tileset
