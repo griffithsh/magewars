@@ -17,7 +17,7 @@ func NewCollisionReversionSystem(bus *event.Bus) *CollisionReversionSystem {
 	const maxEvents = 1000
 	sys := CollisionReversionSystem{
 		bus:       bus,
-		events:    make([]*CollisionEvent, maxEvents/10),
+		events:    make([]*CollisionEvent, 0, maxEvents/10),
 		maxEvents: maxEvents,
 	}
 	event.Subscribe(bus, func(evt *CollisionEvent) {
@@ -41,7 +41,7 @@ func getMass(w *ecs.World, e ecs.Entity) float64 {
 
 }
 
-func (s *CollisionReversionSystem) Update(w *ecs.World, t time.Duration) {
+func (s *CollisionReversionSystem) Update(w *ecs.World, t time.Duration) error {
 	for _, evt := range s.events {
 		p1 := ecs.Get[Position](w, evt.A)
 		p2 := ecs.Get[Position](w, evt.B)
@@ -89,4 +89,6 @@ func (s *CollisionReversionSystem) Update(w *ecs.World, t time.Duration) {
 	}
 	// Truncate events without releasing memory
 	s.events = s.events[:0]
+
+	return nil
 }

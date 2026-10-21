@@ -26,7 +26,8 @@ type Renderer struct {
 	// component should be shown or not.
 	randFloats []float64
 
-	BackgroundColor color.NRGBA
+	BackgroundColor  color.NRGBA
+	DebugCollidables bool
 }
 
 // ImageProvider is the contract that the Renderer needs to retrieve images to
@@ -368,6 +369,10 @@ func (r *Renderer) Render(w *ecs.World, screen *ebiten.Image, focusX, focusY, zo
 	op := ebiten.DrawImageOptions{}
 	op.GeoM.Scale(zoom, zoom)
 	screen.DrawImage(r.worldCanvas, &op)
+
+	if r.DebugCollidables {
+		r.renderDebugCollidables(w, screen, focusX, focusY, zoom)
+	}
 
 	op = ebiten.DrawImageOptions{}
 	screen.DrawImage(r.absoluteCanvas, &op)
