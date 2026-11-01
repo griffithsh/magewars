@@ -56,13 +56,13 @@ func (r *Renderer) renderDebugCollidables(w *ecs.World, screen *ebiten.Image, fo
 			path.Close()
 		} else if poly != nil && len(poly.Vertices) > 0 {
 			path.MoveTo(
-				float32((poly.Vertices[0].X+p.Center.X)*zoom+screenW/2),
-				float32((poly.Vertices[0].Y+p.Center.Y)*zoom+screenH/2),
+				float32((poly.Vertices[0].X+p.Center.X-focusX)*zoom+screenW/2),
+				float32((poly.Vertices[0].Y+p.Center.Y-focusY)*zoom+screenH/2),
 			)
 			for _, vert := range poly.Vertices[1:] {
 				path.LineTo(
-					float32((vert.X+p.Center.X)*zoom+screenW/2),
-					float32((vert.Y+p.Center.Y)*zoom+screenH/2),
+					float32((vert.X+p.Center.X-focusX)*zoom+screenW/2),
+					float32((vert.Y+p.Center.Y-focusY)*zoom+screenH/2),
 				)
 			}
 			path.Close()

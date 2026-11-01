@@ -12,6 +12,7 @@ import (
 	"github.com/griffithsh/magewars/internal/game"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 // Renderer is a System that draws visible things to the screen with the ebiten game engine.
@@ -372,6 +373,10 @@ func (r *Renderer) Render(w *ecs.World, screen *ebiten.Image, focusX, focusY, zo
 
 	if r.DebugCollidables {
 		r.renderDebugCollidables(w, screen, focusX, focusY, zoom)
+	}
+	// debugging hud
+	if true {
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("entity count: %d", len(entities)))
 	}
 
 	op = ebiten.DrawImageOptions{}

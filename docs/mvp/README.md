@@ -67,18 +67,14 @@ Multiple builds (no WASM)
   - pushes things back if they collide? (what if they go right through though?)
     - What if you used the Velocity component to understand where the entity was previously?
       - You depend on this System getting an update *after* ProjectileSystem
-- LevelSystem
+- LevelSystem ✅
   - accepts commands (load level 42, unload level)
   - publishes events (load complete)
   - What component does this operate on though?
     - potentially only need hierarchy/dependancy stuff
-- ControlSystem (TODO: what is this thing's remit exactly?)
 - CameraSystem (follow a mage, hang on, what entity and components does this thing operate on?)
-- A collection of imperative command helpers
-  - loadWorld (take a Tiled map and turn it into Entity and Component create calls)
-  - unloadWorld
-  - followMage (gives CameraSystem a target? what about sniper effects?)
 - Artwork
   - A mage sprite
   - An animated fireball sprite
   - A tileset
+- ControlSystem (TODO: what is this thing's remit exactly?)
