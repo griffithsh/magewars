@@ -46,8 +46,8 @@ func (r *Renderer) renderDebugCollidables(w *ecs.World, screen *ebiten.Image, fo
 		var path vector.Path
 		if circle != nil {
 			path.Arc(
-				float32(p.Center.X*zoom+screenW/2),
-				float32(p.Center.Y*zoom+screenH/2),
+				float32((p.Center.X-focusX)*zoom+screenW/2),
+				float32((p.Center.Y-focusY)*zoom+screenH/2),
 				float32(circle.Radius*zoom),
 				0,
 				float32(2*math.Pi),
