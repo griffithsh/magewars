@@ -28,10 +28,37 @@ type CollidablePolygon struct {
 	// BoundingRadius float64 // TODO: potential optimisation here
 }
 
+// PolygonSignedArea computes the signed area of a 2D polygon using the Shoelace formula.
+// In screen coordinates (+X right, +Y down):
+// - Negative signed area indicates Counter-Clockwise (CCW) winding.
+// - Positive signed area indicates Clockwise (CW) winding.
+func PolygonSignedArea(vertices []Vector2) float64 {
+	n := len(vertices)
+	if n < 3 {
+		return 0
+	}
+	area := 0.0
+	for i := 0; i < n; i++ {
+		j := (i + 1) % n
+		area += vertices[i].X*vertices[j].Y - vertices[j].X*vertices[i].Y
+	}
+	return area / 2.0
+}
+
 func NewCollidablePolygon(vertices []Vector2) *CollidablePolygon {
+	// Ensure vertices are in counter-clockwise order for consistent outward normals.
+	verts := make([]Vector2, len(vertices))
+	copy(verts, vertices)
+	if PolygonSignedArea(verts) > 0 {
+		// Clockwise: reverse to make counter-clockwise
+		for i, j := 0, len(verts)-1; i < j; i, j = i+1, j-1 {
+			verts[i], verts[j] = verts[j], verts[i]
+		}
+	}
+
 	return &CollidablePolygon{
-		Vertices: vertices,
-		normals:  computeOutwardNormals(vertices),
+		Vertices: verts,
+		normals:  computeOutwardNormals(verts),
 	}
 }
 
@@ -62,12 +89,11 @@ func computeOutwardNormals(vertices []Vector2) []Vector2 {
 			Y: p2.Y - p1.Y,
 		}
 
-		// 2. Get the perpendicular vector (rotate 90 degrees)
-		// For a counter-clockwise polygon, rotating 90 degrees clockwise
-		// yields the outward-facing direction.
+		// 2. In screen coordinates (+Y down), for a counter-clockwise polygon,
+		// the outward-facing normal is (-edge.Y, edge.X).
 		normal := Vector2{
-			X: edge.Y,
-			Y: -edge.X,
+			X: -edge.Y,
+			Y: edge.X,
 		}
 
 		// 3. Normalize it (make its length = 1)
@@ -83,66 +109,102 @@ func computeOutwardNormals(vertices []Vector2) []Vector2 {
 	return normals
 }
 
-func projectCircle(center Vector2, radius float64, axis Vector2) (float64, float64) {
-	centerProj := center.X*axis.X + center.Y*axis.Y
-	return centerProj - radius, centerProj + radius
-}
-
-// circlePolyCollisionCheck returns whether a circle and a polygone intersect,
-// and if they do, the smallest axis and penetration depth.
-func circlePolyCollisionCheck(circleCenter Vector2, circleRadius float64, polyVerts []Vector2, polyNormals []Vector2) (bool, Vector2, float64) {
-	minOverlap := math.MaxFloat64
-	var smallestAxis Vector2
-
-	// 1. Test all polygon normals
-	for _, axis := range polyNormals {
-		minP, maxP := projectPolygon(axis, polyVerts)
-		minC, maxC := projectCircle(circleCenter, circleRadius, axis)
-
-		if !overlapExists(minP, maxP, minC, maxC) {
-			return false, Vector2{}, 0
-		}
-
-		overlap := math.Min(maxP, maxC) - math.Max(minP, minC)
-		if overlap < minOverlap {
-			minOverlap = overlap
-			smallestAxis = axis
-		}
-	}
-
-	// 2. Find the closest vertex to the circle center for the corner-check axis
-	closestDistSq := math.MaxFloat64
-	var closestAxis Vector2
-
-	for _, v := range polyVerts {
-		dx := circleCenter.X - v.X
-		dy := circleCenter.Y - v.Y
-		distSq := (dx * dx) + (dy * dy)
-
-		if distSq < closestDistSq {
-			closestDistSq = distSq
-			length := math.Sqrt(distSq)
-			if length > 0 {
-				closestAxis = Vector2{X: dx / length, Y: dy / length}
-			}
-		}
-	}
-
-	// Test the closest-vertex axis
-	minP, maxP := projectPolygon(closestAxis, polyVerts)
-	minC, maxC := projectCircle(circleCenter, circleRadius, closestAxis)
-
-	if !overlapExists(minP, maxP, minC, maxC) {
+// circlePolyCollisionCheck returns whether a circle and a polygon intersect,
+// and if they do, the normal pointing outward from the polygon toward the circle,
+// and the penetration depth.
+func circlePolyCollisionCheck(circleCenter Vector2, circleRadius float64, polyVerts []Vector2) (bool, Vector2, float64) {
+	n := len(polyVerts)
+	if n < 3 {
 		return false, Vector2{}, 0
 	}
 
-	overlap := math.Min(maxP, maxC) - math.Max(minP, minC)
-	if overlap < minOverlap {
-		minOverlap = overlap
-		smallestAxis = closestAxis
+	minDistSq := math.MaxFloat64
+	var closestPoint Vector2
+	var closestEdgeDir Vector2
+
+	for i := 0; i < n; i++ {
+		p1 := polyVerts[i]
+		p2 := polyVerts[(i+1)%n]
+
+		edge := Vector2{X: p2.X - p1.X, Y: p2.Y - p1.Y}
+		eLenSq := edge.X*edge.X + edge.Y*edge.Y
+		if eLenSq == 0 {
+			continue
+		}
+
+		v := Vector2{X: circleCenter.X - p1.X, Y: circleCenter.Y - p1.Y}
+		t := (v.X*edge.X + v.Y*edge.Y) / eLenSq
+		if t < 0 {
+			t = 0
+		} else if t > 1 {
+			t = 1
+		}
+
+		pt := Vector2{X: p1.X + t*edge.X, Y: p1.Y + t*edge.Y}
+		dx := circleCenter.X - pt.X
+		dy := circleCenter.Y - pt.Y
+		distSq := dx*dx + dy*dy
+
+		if distSq < minDistSq {
+			minDistSq = distSq
+			closestPoint = pt
+			closestEdgeDir = edge
+		}
 	}
 
-	return true, smallestAxis, minOverlap
+	// Ray casting to determine if circleCenter is inside the polygon
+	inside := false
+	for i, j := 0, n-1; i < n; j, i = i, i+1 {
+		vi := polyVerts[i]
+		vj := polyVerts[j]
+		if (vi.Y > circleCenter.Y) != (vj.Y > circleCenter.Y) &&
+			circleCenter.X < (vj.X-vi.X)*(circleCenter.Y-vi.Y)/(vj.Y-vi.Y)+vi.X {
+			inside = !inside
+		}
+	}
+
+	dist := math.Sqrt(minDistSq)
+
+	if !inside {
+		if dist >= circleRadius {
+			return false, Vector2{}, 0
+		}
+		penetration := circleRadius - dist
+		var normal Vector2
+		if dist > 1e-9 {
+			normal = Vector2{
+				X: (circleCenter.X - closestPoint.X) / dist,
+				Y: (circleCenter.Y - closestPoint.Y) / dist,
+			}
+		} else {
+			eLen := math.Sqrt(closestEdgeDir.X*closestEdgeDir.X + closestEdgeDir.Y*closestEdgeDir.Y)
+			if eLen > 0 {
+				normal = Vector2{X: closestEdgeDir.Y / eLen, Y: -closestEdgeDir.X / eLen}
+			} else {
+				normal = Vector2{X: 1, Y: 0}
+			}
+		}
+		return true, normal, penetration
+	}
+
+	// circleCenter is inside polygon
+	penetration := circleRadius + dist
+	var normal Vector2
+	if dist > 1e-9 {
+		// Vector from circleCenter toward closest edge point (pushing outward)
+		normal = Vector2{
+			X: (closestPoint.X - circleCenter.X) / dist,
+			Y: (closestPoint.Y - circleCenter.Y) / dist,
+		}
+	} else {
+		eLen := math.Sqrt(closestEdgeDir.X*closestEdgeDir.X + closestEdgeDir.Y*closestEdgeDir.Y)
+		if eLen > 0 {
+			normal = Vector2{X: closestEdgeDir.Y / eLen, Y: -closestEdgeDir.X / eLen}
+		} else {
+			normal = Vector2{X: 1, Y: 0}
+		}
+	}
+	return true, normal, penetration
 }
 
 // projectPolygon is a helper to project a polygon onto an axis and return the
@@ -314,18 +376,34 @@ func (s *CollisionSystem) Update(w *ecs.World, t time.Duration) error {
 			}
 
 			// Has a circle and a polygon collided?
+			// Note: circlePolyCollisionCheck returns normal pointing from Polygon to Circle.
+			// CollisionEvent requires Normal pointing from B to A (direction to push Entity A).
 			if poly1 != nil && c2 != nil {
 				worldVerts := localToWorld(p1.Center.X, p1.Center.Y, poly1.Vertices)
-				if collides, normal, penetration := circlePolyCollisionCheck(Vector2{X: p2.Center.X, Y: p2.Center.Y}, c2.Radius, worldVerts, poly1.normals); collides {
-					// Collision!
-					event.Publish(s.bus, &CollisionEvent{A: e1, B: e2, Normal: normal, Penetration: penetration})
+				if collides, normal, penetration := circlePolyCollisionCheck(Vector2{X: p2.Center.X, Y: p2.Center.Y}, c2.Radius, worldVerts); collides {
+					// Here A is poly1 and B is c2.
+					// normal points from poly1 (A) to c2 (B).
+					// Therefore normal pointing from B to A is -normal.
+					event.Publish(s.bus, &CollisionEvent{
+						A:           e1,
+						B:           e2,
+						Normal:      Vector2{X: -normal.X, Y: -normal.Y},
+						Penetration: penetration,
+					})
 					continue
 				}
 			} else if c1 != nil && poly2 != nil {
 				worldVerts := localToWorld(p2.Center.X, p2.Center.Y, poly2.Vertices)
-				if collides, normal, penetration := circlePolyCollisionCheck(Vector2{X: p1.Center.X, Y: p1.Center.Y}, c1.Radius, worldVerts, poly2.normals); collides {
-					// Collision!
-					event.Publish(s.bus, &CollisionEvent{A: e1, B: e2, Normal: normal, Penetration: penetration})
+				if collides, normal, penetration := circlePolyCollisionCheck(Vector2{X: p1.Center.X, Y: p1.Center.Y}, c1.Radius, worldVerts); collides {
+					// Here A is c1 and B is poly2.
+					// normal points from poly2 (B) to c1 (A).
+					// Therefore normal is already pointing from B to A.
+					event.Publish(s.bus, &CollisionEvent{
+						A:           e1,
+						B:           e2,
+						Normal:      normal,
+						Penetration: penetration,
+					})
 					continue
 				}
 			}

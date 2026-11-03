@@ -46,17 +46,13 @@ func (s *CollisionReversionSystem) Update(w *ecs.World, t time.Duration) error {
 		p1 := ecs.Get[Position](w, evt.A)
 		p2 := ecs.Get[Position](w, evt.B)
 
-		// Safety check if entities were destroyed mid-frame
 		if p1 == nil || p2 == nil {
 			continue
 		}
 
-		// Fetch mass components (default to standard mass if missing)
-		mass1 := getMass(w, evt.A) // e.g., 0.73 for a 73 kg mage, 0 for static wall
+		mass1 := getMass(w, evt.A)
 		mass2 := getMass(w, evt.B)
 
-		// Calculate inverse masses (1 / mass).
-		// If mass is 0 (static wall), inverse mass is 0.
 		invMass1 := float64(0)
 		if mass1 > 0 {
 			invMass1 = 1.0 / mass1
@@ -69,26 +65,58 @@ func (s *CollisionReversionSystem) Update(w *ecs.World, t time.Duration) error {
 
 		totalInvMass := invMass1 + invMass2
 		if totalInvMass == 0 {
-			continue // Both are immovable objects (two walls)
+			continue
+		}
+		// 1. Positional correction: resolve penetration along collision normal.
+		// evt.Normal points from B to A (separation direction for A).
+		if evt.Penetration > 0 {
+			correctionMagnitude := evt.Penetration
+
+			if invMass1 > 0 {
+				ratio := invMass1 / totalInvMass
+				p1.Center.X += evt.Normal.X * correctionMagnitude * ratio
+				p1.Center.Y += evt.Normal.Y * correctionMagnitude * ratio
+			}
+			if invMass2 > 0 {
+				ratio := invMass2 / totalInvMass
+				p2.Center.X -= evt.Normal.X * correctionMagnitude * ratio
+				p2.Center.Y -= evt.Normal.Y * correctionMagnitude * ratio
+			}
 		}
 
-		// Apply positional correction proportional to inverse mass
-		// Entity A moves away from B along the normal
-		if invMass1 > 0 {
-			ratio := invMass1 / totalInvMass
-			p1.Center.X += evt.Normal.X * evt.Penetration * ratio
-			p1.Center.Y += evt.Normal.Y * evt.Penetration * ratio
+		// 2. Velocity correction: cancel relative velocity moving into the collision normal
+		// so the entity stops dead on the boundary and doesn't tunnel back in next frame.
+		v1 := ecs.Get[Velocity](w, evt.A)
+		v2 := ecs.Get[Velocity](w, evt.B)
+
+		relVelX := float64(0)
+		relVelY := float64(0)
+		if v1 != nil {
+			relVelX += v1.X
+			relVelY += v1.Y
+		}
+		if v2 != nil {
+			relVelX -= v2.X
+			relVelY -= v2.Y
 		}
 
-		// Entity B moves in the opposite direction
-		if invMass2 > 0 {
-			ratio := invMass2 / totalInvMass
-			p2.Center.X -= evt.Normal.X * evt.Penetration * ratio
-			p2.Center.Y -= evt.Normal.Y * evt.Penetration * ratio
+		velAlongNormal := relVelX*evt.Normal.X + relVelY*evt.Normal.Y
+
+		if velAlongNormal < 0 {
+			restitution := 0.0 // inelastic: stop dead on boundary
+			impulseScalar := -(1.0 + restitution) * velAlongNormal / totalInvMass
+
+			if v1 != nil && invMass1 > 0 {
+				v1.X += evt.Normal.X * impulseScalar * invMass1
+				v1.Y += evt.Normal.Y * impulseScalar * invMass1
+			}
+			if v2 != nil && invMass2 > 0 {
+				v2.X -= evt.Normal.X * impulseScalar * invMass2
+				v2.Y -= evt.Normal.Y * impulseScalar * invMass2
+			}
 		}
 	}
-	// Truncate events without releasing memory
-	s.events = s.events[:0]
 
+	s.events = s.events[:0]
 	return nil
 }
