@@ -90,4 +90,42 @@ duplicate system registered "ecs.ChildrenSystem"
 		}
 	})
 
+	t.Run("System execution order", func(t *testing.T) {
+		w := NewWorld()
+
+		order := []string{}
+		s1 := &mockSys1{onUpdate: func() { order = append(order, "Steering") }}
+		s2 := &mockSys2{onUpdate: func() { order = append(order, "Motion") }}
+		s3 := &mockSys3{onUpdate: func() { order = append(order, "Collision") }}
+		s4 := &mockSys4{onUpdate: func() { order = append(order, "Reversion") }}
+
+		w.Register(s1, s2, s3, s4)
+
+		for run := 0; run < 10; run++ {
+			order = order[:0]
+			w.Update(16 * time.Millisecond)
+			want := []string{"Steering", "Motion", "Collision", "Reversion"}
+			if len(order) != len(want) {
+				t.Fatalf("run %d: expected %d systems, got %d", run, len(want), len(order))
+			}
+			for i, v := range want {
+				if order[i] != v {
+					t.Fatalf("run %d: expected system order %v, got %v", run, want, order)
+				}
+			}
+		}
+	})
 }
+
+type mockSys1 struct{ onUpdate func() }
+func (m *mockSys1) Update(w *World, elapsed time.Duration) error { m.onUpdate(); return nil }
+
+type mockSys2 struct{ onUpdate func() }
+func (m *mockSys2) Update(w *World, elapsed time.Duration) error { m.onUpdate(); return nil }
+
+type mockSys3 struct{ onUpdate func() }
+func (m *mockSys3) Update(w *World, elapsed time.Duration) error { m.onUpdate(); return nil }
+
+type mockSys4 struct{ onUpdate func() }
+func (m *mockSys4) Update(w *World, elapsed time.Duration) error { m.onUpdate(); return nil }
+

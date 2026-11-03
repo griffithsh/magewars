@@ -12,6 +12,7 @@ type World struct {
 	components   map[reflect.Type]map[Entity]any
 	dependencies map[Entity][]Entity
 	systems      map[string]System
+	systemList   []System
 }
 
 func NewWorld() *World {
@@ -20,6 +21,7 @@ func NewWorld() *World {
 		components:   map[reflect.Type]map[Entity]any{},
 		dependencies: map[Entity][]Entity{},
 		systems:      map[string]System{},
+		systemList:   []System{},
 	}
 }
 
@@ -32,8 +34,10 @@ func (w *World) Register(systems ...System) error {
 
 		if _, ok := w.systems[name]; ok {
 			errs = append(errs, fmt.Errorf("duplicate system registered %q", name))
+			continue
 		}
 		w.systems[name] = system
+		w.systemList = append(w.systemList, system)
 	}
 
 	if len(errs) > 0 {
@@ -48,7 +52,7 @@ func (w *World) Register(systems ...System) error {
 }
 
 func (w *World) Update(elapsed time.Duration) error {
-	for _, s := range w.systems {
+	for _, s := range w.systemList {
 		if err := s.Update(w, elapsed); err != nil {
 			return err
 		}
