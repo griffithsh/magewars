@@ -46,19 +46,9 @@ func PolygonSignedArea(vertices []Vector2) float64 {
 }
 
 func NewCollidablePolygon(vertices []Vector2) *CollidablePolygon {
-	// Ensure vertices are in counter-clockwise order for consistent outward normals.
-	verts := make([]Vector2, len(vertices))
-	copy(verts, vertices)
-	if PolygonSignedArea(verts) > 0 {
-		// Clockwise: reverse to make counter-clockwise
-		for i, j := 0, len(verts)-1; i < j; i, j = i+1, j-1 {
-			verts[i], verts[j] = verts[j], verts[i]
-		}
-	}
-
 	return &CollidablePolygon{
-		Vertices: verts,
-		normals:  computeOutwardNormals(verts),
+		Vertices: vertices,
+		normals:  computeOutwardNormals(vertices),
 	}
 }
 

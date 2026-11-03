@@ -156,7 +156,7 @@ func (a *Archive) interpret(filename string, r io.Reader) error {
 		}
 		a.tiledMaps[filename] = tmx
 	case ".tsx":
-		tsx, err := interpretTSX(r)
+		tsx, err := interpretTSX(filename, r)
 		if err != nil {
 			return err
 		}
@@ -314,8 +314,6 @@ func (a *Archive) GetLevel(name string) (val *game.Level, ok bool) {
 		fmt.Printf("couldn't get the tilesets\n")
 		return nil, false
 	}
-
-	// m.Tilesets[0].FirstGid
 
 	fmt.Printf("full of tilesets: %v\n", tilesets)
 
